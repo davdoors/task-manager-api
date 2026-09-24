@@ -5,14 +5,15 @@ from pydantic import (
     AwareDatetime,
     field_validator
 )
+import api.domain.constants as constants
 from datetime import datetime, timezone
 from api.domain.enums import TaskStatus, TaskPriority
 
 class TaskCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    title: str = Field(min_length=1, max_length=150)
-    content: str = Field(default="", max_length=5000)
+    title: str = Field(min_length=constants.TASK_TITLE_MIN_LENGTH, max_length=constants.TASK_TITLE_MAX_LENGTH)
+    content: str = Field(default="", max_length=constants.TASK_CONTENT_MAX_LENGTH)
     deadline: AwareDatetime
     priority: TaskPriority = TaskPriority.MEDIUM
     status: TaskStatus = TaskStatus.NOT_STARTED
@@ -33,8 +34,8 @@ class TaskCreate(BaseModel):
 class TaskUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    title: str | None = Field(default=None, min_length=1, max_length=150)
-    content: str | None = Field(default=None, max_length=5000)
+    title: str | None = Field(default=None, min_length=constants.TASK_TITLE_MIN_LENGTH, max_length=constants.TASK_TITLE_MAX_LENGTH)
+    content: str | None = Field(default=None, max_length=constants.TASK_CONTENT_MAX_LENGTH)
     deadline: AwareDatetime | None = None
     priority: TaskPriority | None = None
     status: TaskStatus | None = None
