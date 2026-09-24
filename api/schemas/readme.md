@@ -206,6 +206,68 @@ El esquema comprueba los tipos y la presencia de los campos, pero no repite la n
 }
 ```
 
+# Esquemas de autenticación
+
+El archivo `auth.py` define `TokenResponse`, el esquema de salida previsto para el inicio de sesión. Describe la respuesta que contiene el token de acceso; no comprueba las credenciales ni genera tokens.
+
+## TokenResponse
+
+| Campo | Tipo | Obligatorio | Validación o valor predeterminado |
+| --- | --- | --- | --- |
+| `access_token` | `str` | Sí | Al menos un carácter y sin espacios en blanco. No admite `null`. |
+| `token_type` | `Literal["Bearer"]` | No | Solo admite `"Bearer"`, que también es su valor predeterminado. No admite `null`. |
+
+### Validación del token de acceso
+
+`Field(min_length=1)` rechaza una cadena vacía. El validador `validate_token` se ejecuta después de validar el tipo y comprueba cada carácter con `isspace()`.
+
+Si algún carácter es un espacio en blanco, lanza `ValueError("Token must not contain whitespace.")`. Esto incluye espacios normales, tabulaciones y saltos de línea, tanto al principio y al final como en el interior.
+
+El token se conserva exactamente como se recibe: no se utiliza `strip()` ni se transforma su contenido, ya que modificarlo podría invalidarlo.
+
+`repr=False` evita mostrar el token en la representación habitual del modelo. No lo cifra ni lo excluye de `model_dump()` o de la respuesta JSON: el cliente necesita recibirlo. Tampoco garantiza ocultarlo en todos los posibles mensajes de error.
+
+### Tipo de token
+
+`Literal["Bearer"]` restringe el campo a ese valor exacto. Si se omite, se utiliza `"Bearer"`; valores como `"Basic"` o `"bearer"` se rechazan por el contrato actual del esquema.
+
+El cliente utilizará el token de acceso en la cabecera de las peticiones protegidas:
+
+```http
+Authorization: Bearer <access_token>
+```
+
+El campo `access_token` contiene únicamente el token, sin el prefijo `Bearer `.
+
+### Ejemplos de validación
+
+| Entrada | Resultado |
+| --- | --- |
+| `access_token` omitido, vacío o igual a `null` | Rechazada. |
+| `access_token` con espacios, tabulaciones o saltos de línea | Rechazada. |
+| `access_token` con texto no vacío y sin espacios en blanco | Aceptada por este esquema; no demuestra que sea un JWT válido. |
+| `token_type` omitido | Se utiliza `"Bearer"`. |
+| `token_type` igual a `"Basic"` | Rechazada. |
+
+Ejemplo ilustrativo de la estructura de respuesta; el token mostrado no es una credencial válida:
+
+```json
+{
+  "access_token": "example-access-token",
+  "token_type": "Bearer"
+}
+```
+
+### Alcance y responsabilidades
+
+Este esquema valida la estructura de la respuesta, pero no verifica el formato JWT, su firma, sus claims ni su caducidad. Esas comprobaciones corresponden al componente de seguridad al autenticar peticiones.
+
+No define `extra="forbid"`: se aplica el comportamiento predeterminado de Pydantic, que ignora campos adicionales. Los campos de salida definidos son únicamente `access_token` y `token_type`.
+
+Cuando se utilice `response_model=TokenResponse` en el endpoint de autenticación, FastAPI validará y serializará la salida según este contrato. Una respuesta que no lo cumpla constituye un error de la aplicación y normalmente produce un `500`.
+
+No se incluye `refresh_token`. En el flujo previsto, cuando caduque el token de acceso, el usuario deberá iniciar sesión de nuevo. El esquema no implementa por sí mismo este flujo ni la caducidad.
+
 ## Gestión de errores
 
 Los validadores lanzan `ValueError` cuando detectan un valor no permitido. Pydantic recoge estos errores como errores de validación.
