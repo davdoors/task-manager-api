@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+
+# virtual env
+.venv/
+
+
+# Bases de datos locales
+# *.db
+
+# Logs
+*.log
+logs/
+
+
+# IDEs
+.idea/
+.vscode/
+
