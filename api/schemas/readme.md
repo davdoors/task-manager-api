@@ -117,6 +117,94 @@ Define los datos que devuelve la API para una tarea. Todos los campos son obliga
 Este modelo comprueba tipos, campos requeridos y valores de las enumeraciones. No repite los límites de longitud ni la limpieza de los esquemas de entrada. Tampoco convierte la fecha a UTC: exige que tenga zona horaria, pero la normalización debe haberse realizado antes. La capa de persistencia deberá proporcionar fechas con zona horaria al recuperar datos.
 
 Cuando un endpoint declare `response_model=TaskResponse`, FastAPI utilizará el esquema para validar y serializar la respuesta, limitando los campos expuestos a los definidos en él.
+# Esquemas de Usuarios
+El archivo `user.py` define `UserCreate` para validar los datos de registro y `UserResponse` para describir la respuesta pública del usuario.
+
+## UserCreate
+
+Todos los campos de `UserCreate` son obligatorios y ninguno admite `null`.
+
+| Campo | Tipo | Validaciones |
+| --- | --- | --- |
+| `username` | `str` | Entre 3 y 30 caracteres después de normalizar. Solo letras ASCII, números y guion bajo. |
+| `email` | `EmailStr` | Dirección de correo con formato válido. Se eliminan espacios exteriores antes de validarla. |
+| `password` | `str` | Entre 8 y 100 caracteres. Se conserva exactamente como se recibe. |
+
+`ConfigDict(extra="forbid")` rechaza campos no definidos, como `id`, y detecta errores en los nombres de los campos.
+
+### Normalización y validación del nombre de usuario
+
+`normalize_username`, con `mode="before"`, elimina espacios exteriores y convierte el nombre a minúsculas antes de comprobar el tipo y la longitud. Por ejemplo, `"  David_01  "` se convierte en `"david_01"`.
+
+Después, `validate_username` comprueba los caracteres sin expresiones regulares:
+
+- `isascii()` exige caracteres ASCII, descartando letras acentuadas, `ñ` y emojis.
+- `isalnum()` permite letras y números.
+- `character == "_"` permite también el guion bajo.
+- `all(...)` exige que todos los caracteres cumplan la condición.
+
+`isalnum()` por sí solo admite letras de otros alfabetos; por eso se combina con `isascii()`. Los espacios interiores no se eliminan: se rechazan.
+
+### Validación del correo
+
+`strip_email` elimina espacios exteriores antes de que `EmailStr` valide y normalice la dirección. `EmailStr` requiere la dependencia `email-validator`, instalada en el entorno virtual del proyecto.
+
+Esta validación comprueba el formato del correo; no demuestra que el buzón exista ni que pertenezca al usuario. La verificación de propiedad requeriría un proceso adicional, no implementado en este esquema.
+
+### Tratamiento de la contraseña
+
+La contraseña no se recorta ni se convierte a minúsculas. Sus espacios cuentan para la longitud y forman parte de su valor. Actualmente solo se comprueban el tipo y la longitud; no se exigen símbolos, números ni combinaciones de mayúsculas.
+
+`repr=False` evita mostrarla en la representación habitual del modelo, pero no la cifra ni la excluye de `model_dump()` o de todos los posibles mensajes de error. Por ello, no debe registrarse ni devolverse el contenido completo de `UserCreate`.
+
+El esquema no genera el hash de la contraseña. Esa operación corresponde al componente de seguridad utilizado por el servicio antes de guardar el usuario.
+
+### Ejemplo de entrada
+
+```json
+{
+  "username": "  David_01  ",
+  "email": " david@example.com ",
+  "password": "A sample password 123"
+}
+```
+
+El nombre queda como `"david_01"`, el correo como `"david@example.com"` y la contraseña se conserva sin modificaciones.
+
+| Entrada | Resultado |
+| --- | --- |
+| `username` igual a `"ab"` | Rechazada por longitud insuficiente. |
+| `username` igual a `"david name"` | Rechazada por el espacio interior. |
+| `username` igual a `"niño"` | Rechazada por contener un carácter no ASCII. |
+| `email` igual a `"invalid"` | Rechazada por formato incorrecto. |
+| Contraseña de menos de 8 o más de 100 caracteres | Rechazada por longitud. |
+| Un campo obligatorio omitido o enviado como `null` | Rechazada. |
+
+La unicidad del nombre de usuario y del correo no se comprueba aquí: requiere consultar datos y aplicar las restricciones correspondientes en el servicio y la base de datos.
+
+## UserResponse
+
+Define los datos públicos que devuelve la API para un usuario.
+
+| Campo | Tipo | Obligatorio | Significado |
+| --- | --- | --- | --- |
+| `id` | `int` | Sí | Identificador del usuario. |
+| `username` | `str` | Sí | Nombre de usuario. |
+
+`ConfigDict(from_attributes=True)` permite obtener los campos a partir de atributos de un objeto, además de aceptar diccionarios.
+
+No incluye correo, contraseña ni hash de contraseña. Cuando se utiliza como `response_model` de un endpoint, FastAPI valida y serializa la salida con estos campos.
+
+El esquema comprueba los tipos y la presencia de los campos, pero no repite la normalización ni las restricciones de longitud y caracteres de `UserCreate`.
+
+### Ejemplo de respuesta
+
+```json
+{
+  "id": 1,
+  "username": "david_01"
+}
+```
 
 ## Gestión de errores
 
