@@ -3,11 +3,12 @@
 Start the API first, then run:
     python tests/test_python.py
 
-Each run creates a unique test user. Test tasks are removed afterwards;
-the user remains because the API does not expose a user deletion endpoint.
+Each run creates two unique test users. Test tasks are removed afterwards;
+the users remain because the API does not expose a user deletion endpoint.
 """
 
 import argparse
+import sys
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
@@ -52,13 +53,24 @@ def run_tests(base_url: str) -> None:
             json={**credentials, "email": f"test_{suffix}@example.com"},
         )
         expect_status(response, 201)
-        user_id = response.json()["id"]
+        user = response.json()
+        user_id = user["id"]
+        check(type(user_id) is int and user_id > 0, "Expected a positive user ID.")
+        check(user["username"] == credentials["username"], "Unexpected username.")
+        check(not {"password", "password_hash"} & user.keys(), "User response exposes credentials.")
+        expect_status(request("GET", "/users/me"), 401)
+        expect_status(request("POST", "/auth/login", data={**credentials, "password": "wrong-password"}), 401)
 
         response = request("POST", "/auth/login", data=credentials)
         expect_status(response, 200)
-        session.headers["Authorization"] = (
-            f"Bearer {response.json()['access_token']}"
-        )
+        token = response.json()
+        check(isinstance(token.get("access_token"), str) and bool(token["access_token"]), "Expected a nonempty access token.")
+        check(token.get("token_type", "").lower() == "bearer", "Expected Bearer token type.")
+        session.headers["Authorization"] = f"Bearer {token['access_token']}"
+        response = request("GET", "/users/me")
+        expect_status(response, 200)
+        check(response.json() == user, "Authenticated identity differs from registered user.")
+        print("PASS: registration, login, authenticated identity and invalid credentials.")
 
         try:
             # 1. Create a task with the required title, content and deadline.
@@ -133,15 +145,90 @@ def run_tests(base_url: str) -> None:
                 "Unexpected error message for an empty update.",
             )
             print("PASS: reject an empty update (400).")
+            # Every list must contain only the authenticated user's tasks.
+            response = request("GET", "/tasks")
+            expect_status(response, 200)
+            tasks = response.json()
+            check(isinstance(tasks, list), "Expected a task list.")
+            check({item["id"] for item in tasks} == set(task_ids), "Unexpected task list.")
+            check(all(item["user_id"] == user_id for item in tasks), "Unexpected task owner in list.")
+            print("PASS: list all tasks belonging to the current user.")
+
+            # A second session prevents credentials from leaking between users.
+            with requests.Session() as other:
+                def other_request(method: str, path: str, **kwargs) -> requests.Response:
+                    return other.request(method, f"{base_url}{path}", timeout=10, **kwargs)
+
+                other_credentials = {
+                    "username": f"other_{suffix}",
+                    "password": f"Other test password {suffix}!",
+                }
+                response = other_request("POST", "/users", json={
+                    **other_credentials, "email": f"other_{suffix}@example.com",
+                })
+                expect_status(response, 201)
+                other_id = response.json()["id"]
+                check(other_id != user_id, "Users must have distinct IDs.")
+                response = other_request("POST", "/auth/login", data=other_credentials)
+                expect_status(response, 200)
+                other.headers["Authorization"] = f"Bearer {response.json()['access_token']}"
+                for path in ("/tasks", "/tasks/expired"):
+                    response = other_request("GET", path)
+                    expect_status(response, 200)
+                    check(response.json() == [], "Another user's tasks are visible.")
+                expect_status(other_request("GET", f"/tasks/{task_id}"), 404)
+                expect_status(other_request("PATCH", f"/tasks/{task_id}", json={"title": "Unauthorized change"}), 404)
+                expect_status(other_request("DELETE", f"/tasks/{task_id}"), 404)
+
+            response = request("GET", f"/tasks/{task_id}")
+            expect_status(response, 200)
+            check(response.json()["title"] == payload["title"], "Unauthorized update changed the task.")
+            check(response.json()["status"] == "Done", "Unexpected task status after isolation checks.")
+            print("PASS: users cannot list, read, modify or delete another user's tasks.")
+
+            # Invalid input must leave the existing task unchanged.
+            before = response.json()
+            for invalid in (
+                {"status": "Completed"}, {"priority": "Urgent"},
+                {"title": "   "}, {"title": None}, {"user_id": other_id},
+                {"deadline": "2030-01-01T12:00:00"},
+            ):
+                expect_status(request("PATCH", f"/tasks/{task_id}", json=invalid), 422)
+            response = request("GET", f"/tasks/{task_id}")
+            expect_status(response, 200)
+            check(response.json() == before, "Rejected updates changed the task.")
+            print("PASS: invalid updates return 422 without changing stored data.")
+
+            # DELETE is a test in its own right, not just best-effort cleanup.
+            response = request("DELETE", f"/tasks/{task_id}")
+            expect_status(response, 204)
+            check(response.content == b"", "DELETE must return an empty body.")
+            task_ids.remove(task_id)
+            expect_status(request("GET", f"/tasks/{task_id}"), 404)
+            expect_status(request("PATCH", f"/tasks/{task_id}", json={"status": "Done"}), 404)
+            expect_status(request("DELETE", f"/tasks/{task_id}"), 404)
+            response = request("GET", "/tasks")
+            expect_status(response, 200)
+            check({item["id"] for item in response.json()} == {expired_id}, "Deleted task is still listed.")
+            print("PASS: deletion returns an empty 204; missing resources return 404.")
         finally:
-            # Remove only tasks created by this run, including after a failed check.
+            # Attempt every cleanup even if one fails. Preserve any original failure.
+            original_error = sys.exc_info()[1]
+            cleanup_errors = []
             for task_id in task_ids:
                 try:
                     response = request("DELETE", f"/tasks/{task_id}")
-                    if response.status_code not in (204, 404):
-                        print(f"WARNING: could not remove test task {task_id}.")
-                except requests.RequestException:
-                    print(f"WARNING: could not remove test task {task_id}.")
+                    expect_status(response, 204)
+                    check(response.content == b"", "Cleanup DELETE must have no body.")
+                    expect_status(request("GET", f"/tasks/{task_id}"), 404)
+                except (requests.RequestException, AssertionError) as exc:
+                    cleanup_errors.append(f"Task {task_id}: {exc}")
+            if cleanup_errors:
+                message = "Cleanup failed: " + "; ".join(cleanup_errors)
+                if original_error is not None:
+                    print(f"FAIL: {message}", file=sys.stderr)
+                else:
+                    raise AssertionError(message)
 
     print("All assignment checks passed.")
 
