@@ -7,12 +7,12 @@ from api.repositories.task_repository import SQLiteTaskRepository
 from api.repositories.user_repository import SQLiteUserRepository
 from api.services.auth_service import AuthService
 from api.services.user_service import UserService
-from db.session import SessionLocal
+from api.db.session import SessionLocal
 from fastapi import Depends
 from api.services.task_service import TaskService
 from fastapi.security import OAuth2PasswordBearer
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 def get_db():
     with SessionLocal() as session:

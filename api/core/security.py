@@ -7,7 +7,6 @@ from argon2.exceptions import InvalidHashError, VerificationError
 from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
 from api.core.exceptions import AuthenticationError
-from config import TOKEN_DURATION, SECRET, ALGORITHM
 
 class PasswordHasher:
     """Hash and verify passwords using Argon2id with random salts."""

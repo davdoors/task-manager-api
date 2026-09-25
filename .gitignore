@@ -3,6 +3,7 @@ __pycache__/
 
 # virtual env
 .venv/
+.venv-py39/
 
 
 # Bases de datos locales

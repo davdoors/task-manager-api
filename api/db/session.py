@@ -3,12 +3,12 @@
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 
-from api.core.config import settings
+from api.core.config import DATABASE_URL
 
 # Setting check_same_thread=False allows a SQLite connection to be used from different threads when necessary.
 # It does not make session objects safe to share concurrently between threads.
 engine = create_engine(
-    settings.database_url,
+    DATABASE_URL,
     connect_args={"check_same_thread": False},
 )
 
