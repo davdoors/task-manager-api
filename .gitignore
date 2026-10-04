@@ -18,3 +18,5 @@ logs/
 .idea/
 .vscode/
 
+# Environment variables
+.env
