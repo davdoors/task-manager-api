@@ -2,13 +2,13 @@
 
 # Task Manager API
 
-API desarrollada con FastAPI para que cada usuario gestione sus propias tareas. Permite crearlas, consultarlas, modificarlas, eliminarlas y consultar las caducadas. Los datos se guardan en SQLite y las operaciones protegidas requieren un token JWT.
+API desarrollada con FastAPI para que cada usuario gestione sus propias tareas. Permite crearlas, consultarlas, modificarlas, eliminarlas y consultar las caducadas. Los datos se guardan en MySQL y las operaciones protegidas requieren un token JWT.
 
 Cada tarea tiene título, contenido, fecha límite, estado (`Not Started`, `In Progress` o `Done`) y prioridad (`Low`, `Medium` o `High`). Una tarea está caducada cuando su fecha límite ha pasado, incluso si está completada.
 
 ## Cómo leer el mapa
 
-El recorrido habitual es **cliente → router → servicio → repositorio → SQLite**. La respuesta vuelve al cliente como JSON. Los contratos describen las operaciones disponibles: no son un paso adicional que procese los datos.
+El recorrido habitual es **cliente → router → servicio → repositorio → MySQL**. La respuesta vuelve al cliente como JSON. Los contratos describen las operaciones disponibles: no son un paso adicional que procese los datos.
 
 | Módulo | Responsabilidad |
 | --- | --- |
@@ -18,12 +18,12 @@ El recorrido habitual es **cliente → router → servicio → repositorio → S
 | `dependencies.py` | Proporciona sesiones, repositorios y servicios a los endpoints. También identifica al usuario autenticado. |
 | `services/` | Coordina el registro, la comprobación de credenciales y las operaciones sobre las tareas. |
 | `domain/` | Contiene `User`, `Task`, sus enumeraciones y las reglas de las entidades, como validar o cambiar el estado de una tarea. |
-| `repositories/` | Define los contratos e implementa el acceso a SQLite, convirtiendo entidades de dominio en modelos de almacenamiento y viceversa. |
+| `repositories/` | Define los contratos e implementa el acceso a MySQL, convirtiendo entidades de dominio en modelos de almacenamiento y viceversa. |
 | `db/` | Define las tablas con SQLAlchemy y configura las conexiones y sesiones. |
 | `core/` | Contiene configuración, seguridad y excepciones de aplicación. |
 | `exception_handlers.py` | Traduce las excepciones esperadas a respuestas HTTP. |
 
-Los servicios dependen de contratos como `TaskRepository`; `dependencies.py` les proporciona implementaciones como `SQLiteTaskRepository`. Esta separación permite cambiar el almacenamiento sin modificar la lógica del servicio.
+Los servicios dependen de contratos como `TaskRepository`; `dependencies.py` les proporciona implementaciones como `MySQLTaskRepository`. Esta separación permite cambiar el almacenamiento sin modificar la lógica del servicio.
 
 ## Usuarios y autenticación
 
@@ -66,3 +66,16 @@ python tests/test_python.py
 ```
 
 Cada ejecución crea un usuario de prueba y elimina sus tareas al terminar. El usuario permanece porque no hay un endpoint para borrarlo.
+
+## Configuración de MySQL
+
+La API utiliza MySQL mediante SQLAlchemy y PyMySQL. Necesita un servidor MySQL
+y una base de datos creada antes de arrancar; las tablas se crean al iniciar la API.
+
+Configura `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_DATABASE`, `MYSQL_USER` y
+`MYSQL_PASSWORD` en el entorno o en un archivo `.env`. Los valores por defecto
+son `127.0.0.1`, `3306`, `task_manager`, `app` y `app`, respectivamente, para desarrollo local.
+También puedes indicar una URL completa mediante `DATABASE_URL` con el formato
+`mysql+pymysql://usuario:contraseña@host:3306/task_manager`. Esta variable tiene prioridad.
+
+Los datos de la antigua base local no se migran automáticamente a MySQL.

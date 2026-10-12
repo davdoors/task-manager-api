@@ -3,8 +3,8 @@ from api.core.exceptions import AuthenticationError
 from api.core.security import PasswordHasher, TokenManager
 from api.domain.user import User
 from api.repositories.interfaces import UserRepository
-from api.repositories.task_repository import SQLiteTaskRepository
-from api.repositories.user_repository import SQLiteUserRepository
+from api.repositories.task_repository import MySQLTaskRepository
+from api.repositories.user_repository import MySQLUserRepository
 from api.services.auth_service import AuthService
 from api.services.user_service import UserService
 from api.db.session import SessionLocal
@@ -19,16 +19,16 @@ def get_db():
         yield session
 
 def get_task_service(session = Depends(get_db)) -> TaskService:
-    repository = SQLiteTaskRepository(session=session)
+    repository = MySQLTaskRepository(session=session)
     return TaskService(repository)
 
 def get_user_service(session = Depends(get_db)) -> UserService:
-    repository = SQLiteUserRepository(session=session)
+    repository = MySQLUserRepository(session=session)
     password_hasher = PasswordHasher()
     return UserService(repository, password_hasher)
 
 def get_auth_service(session = Depends(get_db)):
-    repository = SQLiteUserRepository(session=session)
+    repository = MySQLUserRepository(session=session)
     password_hasher = PasswordHasher()
     return AuthService(repository, password_hasher)
 
@@ -36,12 +36,12 @@ def get_token_manager() -> TokenManager:
     return TokenManager(secret=SECRET, algorithm=ALGORITHM, duration_days=TOKEN_DURATION_DAYS)
 
 def get_user_repository(session = Depends(get_db)) -> UserRepository:
-    return SQLiteUserRepository(session=session)
+    return MySQLUserRepository(session=session)
 
 def get_current_user(
     token:str = Depends(oauth2_scheme),
     token_manager: TokenManager = Depends(get_token_manager),
-    user_repository: SQLiteUserRepository = Depends(get_user_repository)
+    user_repository: MySQLUserRepository = Depends(get_user_repository)
 ) -> User:
 
     payload = token_manager.decode_access_token(token)

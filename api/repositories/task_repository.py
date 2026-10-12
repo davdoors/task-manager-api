@@ -1,4 +1,4 @@
-"""Persist task entities using SQLAlchemy and SQLite."""
+"""Persist task entities using SQLAlchemy and MySQL."""
 
 from datetime import datetime
 
@@ -12,7 +12,7 @@ from api.domain.task import Task
 from api.repositories.interfaces import TaskRepository
 
 
-class SQLiteTaskRepository(TaskRepository):
+class MySQLTaskRepository(TaskRepository):
     """Store and retrieve tasks within their owner's scope."""
 
     def __init__(self, session: Session) -> None:

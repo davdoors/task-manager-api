@@ -1,7 +1,4 @@
-"""Define SQLAlchemy tables without opening database connections.
-
-SQLite connections must enable PRAGMA foreign_keys = ON in the session layer.
-"""
+"""Define SQLAlchemy tables without opening database connections."""
 
 from __future__ import annotations
 
@@ -19,7 +16,7 @@ from api.domain.enums import TaskPriority, TaskStatus
 class UTCDateTime(TypeDecorator[datetime]):
     """Store naive UTC timestamps and restore timezone-aware UTC values.
 
-    SQLite does not preserve timezone information. Reject naive input so that
+    MySQL DATETIME does not preserve timezone information. Reject naive input so that
     conversion never depends on the machine's local timezone.
     """
 
@@ -72,7 +69,7 @@ class UserModel(Base):
 
     id = Column(Integer, primary_key=True)
     username = Column(String(constants.USER_USERNAME_MAX_LENGTH), unique=True, nullable=False)
-    email = Column(Text, unique=True, nullable=False)
+    email = Column(String(constants.USER_EMAIL_MAX_LENGTH), unique=True, nullable=False)
     password_hash = Column(Text, nullable=False)
 
     # Let the foreign key reject deletion instead of deleting or detaching tasks.
@@ -103,7 +100,7 @@ class TaskModel(Base):
     title = Column(
         String(constants.TASK_TITLE_MAX_LENGTH), nullable=False
     )
-    content = Column(Text, nullable=False, default="", server_default="")
+    content = Column(String(constants.TASK_CONTENT_MAX_LENGTH), nullable=False, default="", server_default="")
     deadline = Column(UTCDateTime(), nullable=False)
     status = Column(
         Enum(

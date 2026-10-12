@@ -1,16 +1,24 @@
 """Define application configuration."""
 
 import os
-from pathlib import Path
+from urllib.parse import quote_plus
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_DATABASE_PATH = PROJECT_ROOT / "data" / "task_manager.db"
+def _mysql_url_from_env() -> str:
+    """Build the MySQL connection URL from environment variables."""
+    user = quote_plus(os.getenv("MYSQL_USER", "app"))
+    password = quote_plus(os.getenv("MYSQL_PASSWORD", "app"))
+    host = os.getenv("MYSQL_HOST", "127.0.0.1")
+    port = os.getenv("MYSQL_PORT", "3306")
+    database = os.getenv("MYSQL_DATABASE", "task_manager")
+    return f"mysql+pymysql://{user}:{password}@{host}:{port}/{database}"
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    f"sqlite:///{DEFAULT_DATABASE_PATH.as_posix()}", # use path in case env key doesn't exist
-)
+
+DATABASE_URL = os.getenv("DATABASE_URL", _mysql_url_from_env())
 
 # Define the encryption algorithm
 ALGORITHM = "HS256"

@@ -13,7 +13,7 @@ from api.domain.user import User
 from api.repositories.interfaces import UserRepository
 
 
-class SQLiteUserRepository(UserRepository):
+class MySQLUserRepository(UserRepository):
     """Persist users through an injected session.
 
     Each write commits its transaction. The caller owns the session lifetime
