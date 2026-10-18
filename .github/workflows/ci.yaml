@@ -1,0 +1,14 @@
+name: First CI
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps: 
+      -name: show message
+        run: echo "Hello, World! Mi first automated workflow"
+
+      -name: Show OS
+        run: uname -a
+
+      -name: Show current folder
+        run: pwd
