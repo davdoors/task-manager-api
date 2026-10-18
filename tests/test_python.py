@@ -98,7 +98,11 @@ def run_tests(base_url: str) -> None:
             actual_deadline = datetime.fromisoformat(
                 task["deadline"].replace("Z", "+00:00")
             )
-            check(actual_deadline == future_deadline, "Unexpected deadline.")
+            check(
+                actual_deadline == future_deadline,
+                f"Unexpected deadline: expected {future_deadline.isoformat()}, "
+                f"received {actual_deadline.isoformat()}",
+            )
             print("PASS: retrieve the task and verify its data (200).")
 
             # 3. Mark it as completed and verify the change was persisted.
