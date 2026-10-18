@@ -59,13 +59,31 @@ jobs:
         if: failure()
         run: cat api.log 2>/dev/null || true
 
-  build:
+  build_and_publish:
     needs: test
-    runs-on: ubuntu-latest
+    # Limits push over main only
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Download code
         uses: actions/checkout@v4
 
-      - name: Build Docker image
-        run: docker build -t task-manager-api:ci .
+      - name: Login to Docker Hub
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          printf '%s' "$DOCKERHUB_TOKEN" |
+            docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+
+      - name: Build image
+        env:
+          IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/task-manager-api
+        run: docker build -t "$IMAGE:${{ github.sha }}" .
+
+      - name: Publish image
+        env:
+          IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/task-manager-api
+        run: docker push "$IMAGE:${{ github.sha }}"
