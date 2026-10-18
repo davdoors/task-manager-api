@@ -8,6 +8,7 @@ from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Index, Strin
 from sqlalchemy.engine import Dialect
 from sqlalchemy.orm import DeclarativeBase, relationship
 from sqlalchemy.types import TypeDecorator
+from sqlalchemy.dialects.mysql import DATETIME
 
 from api.domain import constants
 from api.domain.enums import TaskPriority, TaskStatus
@@ -22,6 +23,11 @@ class UTCDateTime(TypeDecorator[datetime]):
 
     impl = DateTime
     cache_ok = True
+
+    def load_dialect_impl(self, dialect: Dialect):
+        if dialect.name == "mysql":
+            return dialect.type_descriptor(DATETIME(fsp=6))
+        return dialect.type_descriptor(DateTime())
 
     def process_bind_param(
         self, value: datetime | None, dialect: Dialect
