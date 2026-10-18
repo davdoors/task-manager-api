@@ -58,3 +58,14 @@ jobs:
       - name: Show logs if tests fail
         if: failure()
         run: cat api.log 2>/dev/null || true
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t task-manager-api:ci .
