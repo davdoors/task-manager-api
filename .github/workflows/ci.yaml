@@ -2,7 +2,7 @@ name: CI - Task Manager API
 on: [push, pull_request]
 jobs:
   test:
-    runs-on:ubuntu-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 10
 
     services:
@@ -28,7 +28,7 @@ jobs:
 
       # Download the code form the repository
       - name: Download code
-        uses: actions/checkout@v3 
+        uses: actions/checkout@v3
 
       - name: Prepare python
         uses: actions/setup-python@v4
@@ -55,6 +55,6 @@ jobs:
       - name: Run api tests
         run: python tests/test_python.py --base-url http://127.0.0.1:8000
 
-      -name: Show logs if tests fail
+      - name: Show logs if tests fail
         if: failure()
         run: cat api.log 2>/dev/null || true
